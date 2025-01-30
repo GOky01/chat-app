@@ -1,9 +1,9 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../config');
+const Message = require('../models/Message');
 
 const router = express.Router();
-const messages = []; // Тимчасово зберігаємо в пам'яті
 
 const authenticate = (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
@@ -18,14 +18,18 @@ const authenticate = (req, res, next) => {
     }
 };
 
-router.get('/messages', authenticate, (req, res) => {
+// Отримати всі повідомлення
+router.get('/messages', authenticate, async (req, res) => {
+    const messages = await Message.find().populate('user', 'username').sort({ timestamp: 1 });
     res.json(messages);
 });
 
-router.post('/message', authenticate, (req, res) => {
+// Надіслати повідомлення
+router.post('/message', authenticate, async (req, res) => {
     const { text } = req.body;
-    const message = { user: req.user.id, text, timestamp: new Date() };
-    messages.push(message);
+    const message = new Message({ user: req.user.id, text });
+    await message.save();
+
     res.status(201).json(message);
 });
 
