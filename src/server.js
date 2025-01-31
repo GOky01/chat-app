@@ -26,25 +26,37 @@ mongoose.connect(MONGO_URI)
 // Зберігаємо онлайн-користувачів
 const onlineUsers = {};
 
+const Message = require('./models/Message'); // Підключаємо модель
+
 io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    // Список кімнат
-    socket.on("joinRoom", ({ username, room }) => {
+    // Коли юзер підключається до кімнати
+    socket.on("joinRoom", async ({ username, room }) => {
         socket.join(room);
         console.log(`${username} joined room: ${room}`);
 
-        // Сповіщення всередині кімнати
-        socket.to(room).emit("message", `${username} has joined the room`);
+        // Завантажуємо історію повідомлень
+        const messages = await Message.find({ room }).sort({ timestamp: 1 });
+        socket.emit("roomHistory", messages);
+
+        // Повідомляємо про підключення
+        io.to(room).emit("message", `${username} has joined the room`);
     });
 
-    // Обробка повідомлень у кімнаті
-    socket.on("roomMessage", ({ room, message }) => {
+    // Зберігаємо та надсилаємо повідомлення
+    socket.on("roomMessage", async ({ room, message, username }) => {
         console.log(`Message in room ${room}: ${message}`);
-        io.to(room).emit("roomMessage", message); // Надсилаємо всім у кімнаті
+
+        // Зберігаємо в MongoDB
+        const newMessage = new Message({ room, username, text: message });
+        await newMessage.save();
+
+        // Розсилаємо повідомлення всім у кімнаті
+        io.to(room).emit("roomMessage", newMessage);
     });
 
-    // Від'єднання користувача
+    // Від'єднання
     socket.on("disconnect", () => {
         console.log("User disconnected:", socket.id);
     });
