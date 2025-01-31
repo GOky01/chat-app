@@ -19,25 +19,34 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 
-// Підключення до MongoDB
 mongoose.connect(MONGO_URI)
     .then(() => console.log('MongoDB connected'))
     .catch(err => console.error('MongoDB connection error:', err));
 
-// Обробка підключення WebSocket
+// Зберігаємо онлайн-користувачів
+const onlineUsers = {};
+
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    // Отримуємо повідомлення від клієнта
-    socket.on('chatMessage', (msg) => {
-        console.log('Message received:', msg);
+    // Коли користувач логіниться/підключається
+    socket.on('addUser', (username) => {
+        onlineUsers[socket.id] = username;
+        console.log(`${username} is online`);
 
-        // Надсилаємо всім підключеним юзерам
-        io.emit('chatMessage', msg);
+        // Надсилаємо список онлайн-користувачів всім клієнтам
+        io.emit('updateUsers', Object.values(onlineUsers));
     });
 
+    // Від'єднання
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
+
+        // Видаляємо юзера зі списку
+        delete onlineUsers[socket.id];
+
+        // Оновлюємо список онлайн-користувачів
+        io.emit('updateUsers', Object.values(onlineUsers));
     });
 });
 
