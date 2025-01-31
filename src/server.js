@@ -26,28 +26,29 @@ mongoose.connect(MONGO_URI)
 // Зберігаємо онлайн-користувачів
 const onlineUsers = {};
 
-io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+io.on("connection", (socket) => {
+    console.log("User connected:", socket.id);
 
-    // Коли користувач логіниться/підключається
-    socket.on('addUser', (username) => {
-        onlineUsers[socket.id] = username;
-        console.log(`${username} is online`);
+    // Список кімнат
+    socket.on("joinRoom", ({ username, room }) => {
+        socket.join(room);
+        console.log(`${username} joined room: ${room}`);
 
-        // Надсилаємо список онлайн-користувачів всім клієнтам
-        io.emit('updateUsers', Object.values(onlineUsers));
+        // Сповіщення всередині кімнати
+        socket.to(room).emit("message", `${username} has joined the room`);
     });
 
-    // Від'єднання
-    socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
+    // Обробка повідомлень у кімнаті
+    socket.on("roomMessage", ({ room, message }) => {
+        console.log(`Message in room ${room}: ${message}`);
+        io.to(room).emit("roomMessage", message); // Надсилаємо всім у кімнаті
+    });
 
-        // Видаляємо юзера зі списку
-        delete onlineUsers[socket.id];
-
-        // Оновлюємо список онлайн-користувачів
-        io.emit('updateUsers', Object.values(onlineUsers));
+    // Від'єднання користувача
+    socket.on("disconnect", () => {
+        console.log("User disconnected:", socket.id);
     });
 });
+
 
 server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
